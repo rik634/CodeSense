@@ -1,0 +1,94 @@
+spring:
+  application:
+    name: codesense
+
+  # Database
+  datasource:
+    url: jdbc:postgresql://localhost:5432/codesense
+    username: codesense_user
+    password: codesense_pass
+    hikari:
+      maximum-pool-size: 10
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+  # Redis cache
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000   # 1 hour TTL for cached AI responses
+
+  # ─────────────────────────────────────
+  # Spring AI Configuration
+  # ─────────────────────────────────────
+  ai:
+    # OpenAI — used in production
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: gpt-4o-mini          # cheap + good enough for code Q&A
+          temperature: 0.2            # low temp: consistent, factual code answers
+          max-tokens: 2000
+      embedding:
+        options:
+          model: text-embedding-3-small  # 1536 dims, great quality, low cost
+
+    # Ollama — used in local dev and tests (switch ai.active=ollama)
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        options:
+          model: llama3.2
+          temperature: 0.2
+      embedding:
+        enabled: false   # disabled in prod; enabled only in local profile
+
+    # pgvector — the vector store backed by your PostgreSQL
+    vectorstore:
+      pgvector:
+        index-type: HNSW              # Hierarchical Navigable Small World index
+        distance-type: COSINE_DISTANCE  # cosine similarity (best for text embeddings)
+        dimensions: 1536              # MUST match your embedding model output size
+        initialize-schema: true       # auto-creates the vector_store table on startup
+
+# ─────────────────────────────────────
+# Resilience4j — protect LLM API calls
+# ─────────────────────────────────────
+resilience4j:
+  ratelimiter:
+    instances:
+      llm-api:
+        limit-for-period: 60          # max 60 requests per minute
+        limit-refresh-period: 1m
+        timeout-duration: 5s
+  circuitbreaker:
+    instances:
+      llm-api:
+        sliding-window-size: 10
+        failure-rate-threshold: 50    # open circuit if 50%+ requests fail
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+
+# Metrics endpoint (for Prometheus / Grafana)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  metrics:
+    tags:
+      application: codesense
+
+logging:
+  level:
+    com.codesense: DEBUG
+    org.springframework.ai: INFO
