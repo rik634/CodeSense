@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with pgvector extension pre-installed
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: codesense-postgres
+    environment:
+      POSTGRES_DB: codesense
+      POSTGRES_USER: codesense_user
+      POSTGRES_PASSWORD: codesense_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codesense_user -d codesense"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching LLM responses
+  redis:
+    image: redis:7-alpine
+    container_name: codesense-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  # Ollama — run LLMs locally (free, no API key)
+  # Used for local dev and integration tests
+  ollama:
+    image: ollama/ollama:latest
+    container_name: codesense-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Pull the model on startup
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull llama3.2 && ollama pull nomic-embed-text && wait"]
+
+volumes:
+  pgdata:
+  ollama_data:

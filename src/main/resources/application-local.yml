@@ -1,0 +1,44 @@
+# Local dev profile — no OpenAI API key or Redis required.
+# Activate: ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+#       or: SPRING_PROFILES_ACTIVE=local in .env
+
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiChatAutoConfiguration
+
+  # Swap Redis for simple in-memory cache — no Redis container needed
+  cache:
+    type: simple
+
+  ai:
+    # Disable OpenAI auto-configuration (no API key needed locally)
+    openai:
+      api-key: "not-needed"
+      chat:
+        enabled: false
+      embedding:
+        enabled: false
+
+    # Ollama handles both chat and embeddings locally
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        options:
+          model: llama3.2
+          temperature: 0.2
+      embedding:
+        enabled: true
+        options:
+          model: nomic-embed-text   # 768-dim embeddings, free, runs locally
+
+    # nomic-embed-text outputs 768 dims — override the production 1536
+    vectorstore:
+      pgvector:
+        dimensions: 768
+
+logging:
+  level:
+    com.codesense: DEBUG
+    org.springframework.ai: DEBUG  # verbose locally to see RAG retrieval
